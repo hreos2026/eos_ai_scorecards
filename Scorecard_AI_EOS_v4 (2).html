@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scorecard AI & Automatizari — EOS KSI Romania</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red:#EA0029; --green:#2F7C85; --green-light:#64AAB2; --black:#31171F;
+  --white:#fff; --gl:#F4F5F7; --gm:#D4D7DC; --gd:#6B7280;
+  --border:#E5E7EB; --bg:#F0F2F5;
+  --sidebar-bg:#1C0F13; --sidebar-hover:rgba(255,255,255,0.06);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.08); --shadow-md:0 4px 12px rgba(0,0,0,0.1);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',Arial,sans-serif;font-size:13px;background:var(--bg);color:var(--black);}
+.app{display:flex;height:100vh;}
+.sidebar{width:272px;min-width:272px;background:var(--sidebar-bg);display:flex;flex-direction:column;overflow:hidden;box-shadow:2px 0 12px rgba(0,0,0,0.25);}
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+
+/* SIDEBAR */
+.sidebar-logo{padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,0.08);}
+/* eos text replaced by real logo */
+.sidebar-logo .sub{font-size:10px;color:rgba(255,255,255,0.38);margin-top:3px;letter-spacing:0.6px;text-transform:uppercase;}
+.sidebar-section{padding:14px 18px 6px;font-size:10px;color:rgba(255,255,255,0.28);text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+.person-list{flex:1;overflow-y:auto;padding:4px 8px 6px;}
+.person-list::-webkit-scrollbar{width:3px;}
+.person-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:2px;}
+.person-item{padding:9px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.15s,transform 0.1s;margin-bottom:3px;}
+.person-item:hover{background:var(--sidebar-hover);}
+.person-item.active{background:rgba(234,0,41,0.15);border-left:3px solid var(--red);padding-left:7px;}
+.person-avatar{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;font-family:'DM Mono',monospace;}
+.person-avatar.scored{background:rgba(47,124,133,0.55);}
+.person-avatar.final{background:rgba(47,124,133,0.85);}
+.person-info{flex:1;min-width:0;}
+.person-name{font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.person-meta{font-size:10px;color:rgba(255,255,255,0.38);margin-top:2px;}
+.person-meta.pst{color:#6EC6B0;}
+.person-meta.st{color:#F5C842;}
+.person-meta.sst{color:#F08080;}
+.badge-final{font-size:8px;background:rgba(100,170,178,0.2);color:var(--green-light);border-radius:4px;padding:1px 6px;margin-left:5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;}
+
+/* Mini chart in sidebar */
+.mini-chart{display:flex;align-items:flex-end;gap:2px;height:18px;margin-top:5px;}
+.mini-bar{width:5px;border-radius:2px 2px 0 0;transition:height 0.3s;}
+.mini-bar.b0{background:rgba(255,255,255,0.15);}
+.mini-bar.b1{background:#F08080;}
+.mini-bar.b2{background:#F5C842;}
+.mini-bar.b3{background:#6EC6B0;}
+
+/* Progress bar */
+.progress-wrap{margin-top:5px;}
+.progress-bar-bg{height:3px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--green-light),var(--green));border-radius:2px;transition:width 0.4s ease;}
+.progress-label{font-size:9px;color:rgba(255,255,255,0.28);margin-top:2px;}
+
+.sidebar-footer{padding:8px 8px 10px;display:flex;flex-direction:column;gap:6px;}
+.btn-add{padding:9px;background:rgba(234,0,41,0.12);border:1px solid rgba(234,0,41,0.35);border-radius:8px;color:rgba(255,255,255,0.82);font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:background 0.15s;font-family:'DM Sans',sans-serif;}
+.btn-add:hover{background:rgba(234,0,41,0.25);}
+.sidebar-row2{display:flex;gap:6px;}
+.btn-export-xl{flex:1;padding:8px;background:var(--green);border:none;border-radius:8px;color:white;font-size:11px;font-weight:600;cursor:pointer;text-align:center;transition:opacity 0.15s;font-family:'DM Sans',sans-serif;}
+.btn-export-xl:hover{opacity:0.85;}
+.btn-reset-all{padding:8px 11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:rgba(255,255,255,0.45);font-size:11px;cursor:pointer;transition:all 0.15s;font-family:'DM Sans',sans-serif;}
+.btn-reset-all:hover{background:rgba(234,0,41,0.15);border-color:rgba(234,0,41,0.4);color:#F08080;}
+
+/* TOPBAR */
+.topbar{background:white;border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;gap:12px;flex-shrink:0;box-shadow:var(--shadow-sm);}
+.topbar h1{font-size:14px;font-weight:600;color:var(--black);}
+.score-badge{font-size:22px;font-weight:700;color:var(--black);font-family:'DM Mono',monospace;}
+.calificativ{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:0.2px;}
+.cal-none{background:var(--gl);color:var(--gd);}
+.cal-sst{background:#FDEAED;color:var(--red);}
+.cal-st{background:#FFFBEA;color:#92700A;}
+.cal-pst{background:#E6F6F5;color:var(--green);}
+.topbar-actions{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.btn-pdf{padding:7px 13px;background:white;border:1.5px solid var(--gm);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;color:var(--black);transition:border-color 0.15s,color 0.15s;font-family:'DM Sans',sans-serif;}
+.btn-pdf:hover{border-color:var(--green);color:var(--green);}
+.btn-duplicate{padding:7px 13px;background:white;border:1.5px solid var(--gm);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;color:var(--black);transition:border-color 0.15s,color 0.15s;font-family:'DM Sans',sans-serif;}
+.btn-duplicate:hover{border-color:var(--green-light);color:var(--green);}
+.btn-finalize{padding:7px 16px;background:var(--green);border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;color:white;transition:opacity 0.15s,box-shadow 0.15s;font-family:'DM Sans',sans-serif;box-shadow:0 2px 6px rgba(47,124,133,0.3);}
+.btn-finalize:hover{opacity:0.88;box-shadow:0 4px 10px rgba(47,124,133,0.4);}
+.btn-delete{padding:6px 10px;background:transparent;border:1.5px solid rgba(234,0,41,0.25);border-radius:7px;color:var(--red);font-size:11px;cursor:pointer;transition:background 0.15s;}
+.btn-delete:hover{background:#FDEAED;}
+
+.saved-indicator{font-size:10px;color:var(--green);display:flex;align-items:center;gap:4px;opacity:0;transition:opacity 0.5s;font-weight:500;}
+.saved-indicator.show{opacity:1;}
+
+.finalized-banner{background:linear-gradient(135deg,#E6F6F5,#EAF8F7);border:1px solid #9DD6D0;border-radius:8px;padding:10px 16px;margin-bottom:14px;font-size:12px;color:var(--green);font-weight:600;display:flex;align-items:center;gap:8px;}
+
+/* FORM AREA */
+.form-area{padding:20px 24px;flex:1;}
+.section-card{background:white;border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow-sm);}
+.sc-header{padding:9px 16px;font-size:10.5px;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.8px;display:flex;align-items:center;gap:8px;}
+.sc-header.dark{background:var(--black);}
+.sc-header.red{background:var(--red);}
+.sc-header.green-h{background:var(--green);}
+
+/* INFO GRID */
+.info-grid{display:grid;grid-template-columns:repeat(4,1fr);}
+.info-field{padding:12px 16px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);transition:background 0.15s;}
+.info-field:nth-child(4n){border-right:none;}
+.info-field:nth-last-child(-n+4){border-bottom:none;}
+.info-field:focus-within{background:#FAFFFE;}
+.info-field label{display:block;font-size:9.5px;color:var(--gd);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:5px;font-weight:600;}
+.info-field input{width:100%;border:none;outline:none;font-size:13px;color:var(--black);background:transparent;font-family:'DM Sans',sans-serif;font-weight:500;}
+.info-field input:disabled{color:var(--gd);}
+
+/* NOTE GENERALA */
+.note-field{padding:12px 16px;}
+.note-field label{display:block;font-size:9.5px;color:var(--gd);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;font-weight:600;}
+.note-textarea{width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;font-family:'DM Sans',sans-serif;resize:vertical;min-height:64px;color:var(--black);background:white;transition:border-color 0.15s;}
+.note-textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(47,124,133,0.08);}
+.note-textarea:disabled{background:var(--gl);color:var(--gd);}
+
+/* CRITERIA TABLE */
+table.ct{width:100%;border-collapse:collapse;}
+table.ct th{background:var(--red);color:white;padding:9px 7px;font-size:11px;font-weight:700;text-align:center;border:1px solid #c20020;letter-spacing:0.3px;}
+table.ct th:first-child{text-align:left;}
+.subrow td{background:#E8E9EC;font-size:10px;font-weight:700;text-align:center;padding:4px 6px;border:1px solid var(--border);color:var(--gd);letter-spacing:0.3px;text-transform:uppercase;}
+table.ct td{padding:8px 7px;border:1px solid var(--border);vertical-align:middle;line-height:1.45;font-size:11px;}
+.crit-cell{background:var(--gl);font-weight:700;text-align:center;color:var(--black);font-size:10.5px;}
+.gray-desc{background:var(--gl);color:#4B5563;font-size:10.5px;}
+table.ct tbody tr{transition:background 0.1s;}
+table.ct tbody tr:hover td{background:#FFF5F6 !important;}
+table.ct tbody tr:hover .gray-desc{background:#FDEAED !important;}
+table.ct tbody tr:hover .crit-cell{background:#EBEBEB !important;}
+
+/* Score select */
+.score-sel{width:54px;text-align:center;font-size:14px;font-weight:700;border:1.5px solid var(--gm);border-radius:6px;padding:5px 4px;background:var(--gl);color:var(--gd);outline:none;cursor:pointer;transition:border-color 0.2s,background 0.2s,color 0.2s;font-family:'DM Mono',monospace;}
+.score-sel:disabled{opacity:0.6;cursor:not-allowed;}
+.score-sel.s1{border-color:#EA0029;background:#FDEAED;color:#EA0029;}
+.score-sel.s2{border-color:#B8860B;background:#FFFBEA;color:#92700A;}
+.score-sel.s3{border-color:#2F7C85;background:#E6F6F5;color:#2F7C85;}
+
+.comment-inp{width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 7px;font-size:11px;font-family:'DM Sans',sans-serif;resize:none;background:white;color:var(--black);transition:border-color 0.15s;}
+.comment-inp:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 2px rgba(47,124,133,0.08);}
+.comment-inp:disabled{background:var(--gl);color:var(--gd);}
+.total-row td{background:var(--green);color:white;font-weight:700;font-size:13px;padding:10px 8px;border:1px solid #1e5e66;}
+
+/* SCALE TABLE */
+.scale-table{width:100%;border-collapse:collapse;}
+.scale-table th{background:var(--black);color:white;padding:7px 14px;font-size:11px;text-align:center;border:1px solid #222;}
+.scale-table td{background:var(--gl);padding:7px 14px;font-size:11px;text-align:center;border:1px solid var(--border);color:var(--black);}
+.scale-table tr:nth-child(1) td:first-child{color:var(--red);font-weight:700;}
+.scale-table tr:nth-child(2) td:first-child{color:#92700A;font-weight:700;}
+.scale-table tr:nth-child(3) td:first-child{color:var(--green);font-weight:700;}
+
+/* SIGNATURES */
+.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px;}
+.sig-box{background:white;border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow-sm);}
+.sig-content{padding:14px 18px;}
+.sig-line{border-top:1px dashed var(--gm);margin-top:24px;}
+.sig-labels{display:flex;gap:24px;font-size:11px;color:var(--gd);}
+
+/* EMPTY STATE */
+.empty-state{padding:60px 28px;text-align:center;color:var(--gd);flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.empty-icon{font-size:44px;color:var(--gm);margin-bottom:16px;}
+.empty-state p{margin-bottom:20px;line-height:1.7;font-size:14px;}
+.empty-state button{padding:10px 26px;background:var(--red);border:none;border-radius:8px;color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 2px 8px rgba(234,0,41,0.3);}
+
+/* VALIDATION */
+.val-error{background:#FDEAED;border:1px solid rgba(234,0,41,0.4);border-radius:8px;padding:10px 16px;margin-bottom:14px;font-size:12px;color:var(--red);display:none;}
+.val-error.show{display:flex;align-items:flex-start;gap:8px;}
+.val-error ul{margin:4px 0 0 14px;}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--black);color:white;padding:10px 18px;border-radius:9px;font-size:12px;font-weight:500;z-index:9999;opacity:0;transform:translateY(10px);transition:opacity 0.25s,transform 0.25s;pointer-events:none;box-shadow:var(--shadow-md);}
+.toast.show{opacity:1;transform:translateY(0);}
+
+@media print {
+  .app{display:block;height:auto;}
+  .sidebar{display:none!important;}
+  .topbar{display:none!important;}
+  .main{overflow:visible;}
+  .form-area{padding:0;}
+  .finalized-banner,.val-error{display:none!important;}
+  .section-card{break-inside:avoid;margin-bottom:10px;}
+  body{font-size:11px;background:white;}
+  .pdf-header{display:flex!important;}
+  .pdf-footer{display:block!important;}
+  @page{margin:15mm 12mm;size:A4;}
+}
+.pdf-header{display:none;align-items:center;gap:16px;padding-bottom:10px;border-bottom:3px solid var(--red);margin-bottom:14px;}
+.pdf-header .eos-logo{font-size:32px;font-weight:700;color:var(--red);letter-spacing:-1px;}
+.pdf-header .pdf-title{font-size:14px;font-weight:700;color:var(--black);}
+.pdf-header .pdf-sub{font-size:10px;color:var(--gd);margin-top:2px;}
+.pdf-footer{display:none;text-align:center;font-size:9px;color:var(--gd);padding-top:10px;border-top:1px solid var(--gm);margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <img src="data:image/svg+xml;base64,PHN2ZyBpZD0iRU9TLUxvZ29fMjAyMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2aWV3Qm94PSIwIDAgNzQwLjk0ODAzIDQyMy44ODA1MyI+PGRlZnM+PHN0eWxlPi5jbHMtMXtmaWxsOiNlYTAwMjk7fTwvc3R5bGU+PC9kZWZzPjxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTU2NS42ODgzNSwxOTMuMTkwNTloLTYxLjEzN2MuMjcyLjI3MSw3LjA2NSwxNC45NDQsMzguMDQxLDI5LjA3NGwxOS41NjMsOC45NjZjMTIuMjI4LDUuNzA2LDIzLjM2OCw5Ljc4MiwyMy4zNjgsMjIuMjgxLDAsMTYuMzAzLTE1LjQ4OCwyMC4zNzktMjUuODEzLDIwLjM3OS0xNy4xMTgsMC0zMi4wNjMtOC45NjctNDQuODM0LTI2LjM1N2wtMjUuOTI0MzQsMTkuMTAzLjExMTM1LjE4OWMxNC42NzMsMjUuMjcsMzkuMzk5LDQwLjIxNSw3MC4zNzUsNDAuMjE1LDM5Ljk0MywwLDY0LjY2OS0yMy42NCw2NC42NjktNTQuNjE2LDAtMjIuMjgxLTExLjY4NC0zNi4xMzgtMzYuNDEtNDguMzY2Wm0xOS44MzUtMTcuOTM0YzE2LjU3NSwwLDI5LjM0NjA2LTEyLjc3LDI5LjM0NjA2LTI5LjA3NGEyOC44ODc3MSwyOC44ODc3MSwwLDAsMC0yOS4zNDYwNi0yOS4zNDVjLTE2LjMwMywwLTI5LjA3NCwxMi43NzEtMjkuMDc0LDI5LjM0NWEyOC43NjQzLDI4Ljc2NDMsMCwwLDAsMjkuMDc0LDI5LjA3NG0tMzk2LjczMi0xMi4xMTdjLTQwLjU1OSwwLTcxLjk1MSwzMS4zOTMtNzEuOTUxLDcxLjk0OSwwLDQwLjU1OCwzMS42Nyw3MS45NTEsNzUuMjgzLDcxLjk1MSwyMS4xMTMsMCwzOS40NDgtNy41LDU1LjAwMi0yMC41NTdsLTE1LjU1NC0yNS41NThjLTExLjExNSw4LjYxMS0yMy4zMzQsMTMuODg5LTM4LjMzNywxMy44ODktMjAuMDAyLDAtMzQuMTY2LTkuNzIxLTM4LjYxNS0yNy4yMjRoOTYuMzk2YTk2LjExNyw5Ni4xMTcsMCwwLDAsMi41MDItMjAuNTU3YzAtMzUuNTU4LTI2LjExNC02My44OTMtNjQuNzI2LTYzLjg5M20tMzQuMTcyLDU4LjA2MmM0LjE2OC0xNy4yMjUsMTYuOTQ3LTI3Ljc4LDMyLjc4MS0yNy43OHMyOS40NDYsMTAuMjc3LDI5LjcyNCwyNy43OFptMjIyLjEwOS0xMDQuMzYzYy01My45NDUsMC05Ny4zMjcsNDEuMTU1LTk3LjMyNyw5NS4xLDAsNTMuOTQ4LDQzLjM4Miw5NS4xMDMsOTcuMzI3LDk1LjEwM3M5Ny44ODItNDEuMTU1LDk3Ljg4Mi05NS4xMDNjMC01My45NDUtNDMuOTM3LTk1LjEtOTcuODgyLTk1LjFtLjI3OCwxNTUuNDQzYy0zNC4yMDUsMC01OC45NTItMjQuNzUtNTguOTUyLTYwLjM0MywwLTM1LjMxNSwyNC43NDctNjAuMzQyLDU4Ljk1Mi02MC4zNDIsMzMuNjQ2LDAsNTguOTUxLDI1LjAyNyw1OC45NTEsNjAuMzQyLDAsMzUuNTkzLTI1LjMwNSw2MC4zNDMtNTguOTUxLDYwLjM0MyIvPjwvc3ZnPg==" alt="EOS Logo" style="height:32px;width:auto;display:block;margin-bottom:6px;">
+    <div class="sub">Scorecard AI & Automatizari</div>
+  </div>
+  <div class="sidebar-section">Persoane evaluate</div>
+  <div class="person-list" id="person-list"></div>
+  <div class="sidebar-footer">
+    <button class="btn-add" onclick="addPerson()">+ Evaluare noua</button>
+    <div class="sidebar-row2">
+      <button class="btn-export-xl" onclick="exportExcel()">&#8595; Export Excel</button>
+      <button class="btn-reset-all" onclick="resetAll()" title="Sterge toate evaluarile">&#9851; Reset</button>
+    </div>
+  </div>
+</div>
+
+<div class="main" id="main-area">
+  <div class="empty-state">
+    <div class="empty-icon">&#9881;</div>
+    <p>Nicio evaluare activa.<br>Adauga prima persoana pentru a incepe.</p>
+    <button onclick="addPerson()">+ Evaluare noua</button>
+  </div>
+</div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CRITERIA = [
+  {criteriu:"Proiecte AI & Automatizari",obiectiv:"Implicare in proiecte AI si automatizari",indicator:"Nr. proiecte la care a contribuit activ in trimestru",pondere:0.25,sst:"0 proiecte noi; rol pasiv sau absent",st:"1 proiect activ cu contributie dovedita (analiza, testare, implementare partiala)",pst:"2+ proiecte cu contributie substantiala si livrabile concrete finalizate"},
+  {criteriu:"",obiectiv:"Calitatea livrabilor in proiectele AI",indicator:"Livrabilele sunt complete, documentate si utile stakeholderilor",pondere:0.15,sst:"Livrabile incomplete, nedocumentate sau returnate cu obiectii majore",st:"Livrabile complete, functionale, documentatie de baza acceptata",pst:"Livrabile excelente, bine documentate, refolosite ca bune practici"},
+  {criteriu:"Adoptie AI in Cultura Org.",obiectiv:"Initiative de implementare AI in cultura organizationala",indicator:"Nr. initiative/actiuni pentru cresterea gradului de adoptie AI",pondere:0.15,sst:"Nicio initiativa proprie; implicare minima la cerere",st:"1-2 initiative sustinute (workshop, comunicare interna, ghid tool AI)",pst:"3+ initiative cu impact masurabil: crestere utilizare tool, feedback pozitiv"},
+  {criteriu:"",obiectiv:"Masurarea si raportarea gradului de adoptie AI",indicator:"Chestionare, analize, rapoarte privind adoptia AI in organizatie",pondere:0.10,sst:"Nicio analiza sau raportare; date lipsa sau incorecte",st:"Cel putin 1 analiza/chestionar complet cu concluzii prezentate echipei",pst:"Analiza sistematica trimestriala cu recomandari actionate; metodologie documentata"},
+  {criteriu:"Evenimente AI",obiectiv:"Organizare/contributie la evenimente AI (hackathon, AI summit etc.)",indicator:"Grad de implicare in organizarea si desfasurarea evenimentelor AI",pondere:0.15,sst:"Nicio implicare in evenimente AI in trimestrul evaluat",st:"Participare activa la organizarea unui eveniment (logistica, comunicare, facilitare)",pst:"Initierea si coordonarea unui eveniment AI cu livrabile clare si feedback pozitiv"},
+  {criteriu:"",obiectiv:"Impactul evenimentelor organizate",indicator:"Nr. participanti, rating eveniment, actiuni concrete generate",pondere:0.05,sst:"Eveniment anulat, participare slaba (<50% tinta) sau feedback negativ",st:"Eveniment conform planului, participare la target, feedback pozitiv",pst:"Participare peste target, feedback excelent si cel putin 1 actiune concreta generata"},
+  {criteriu:"Dezvoltare Personala AI",obiectiv:"Dobandirea si aplicarea de noi competente AI",indicator:"Cursuri/certificari/experimente AI finalizate si aplicate in activitate",pondere:0.10,sst:"Nicio activitate de invatare AI in trimestru",st:"Cel putin 1 curs/certificare finalizata sau tool AI nou testat si documentat",pst:"2+ cursuri/certificari sau proiect personal AI cu aplicabilitate demonstrata"},
+  {criteriu:"",obiectiv:"Diseminarea cunostintelor AI in echipa",indicator:"Prezentari interne, ghiduri, sesiuni Q&A pe teme AI pentru colegi",pondere:0.05,sst:"Nicio sesiune de diseminare; cunostintele nu au fost impartasite",st:"Cel putin 1 sesiune de sharing (prezentare, demo, ghid scris) in trimestru",pst:"Sesiuni regulate de diseminare + material reutilizabil creat (ghid, tutorial, template)"},
+];
+
+const LS_KEY = "scorecard_eos_v3";
+let persons = [];
+let activeId = null;
+let saveTimer = null;
+
+// ---- PERSISTENCE ----
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) persons = JSON.parse(raw);
+  } catch(e) { persons = []; }
+}
+
+function saveToStorage() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(persons)); } catch(e) {}
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveToStorage();
+    const ind = document.getElementById("saved-ind");
+    if (ind) { ind.classList.add("show"); setTimeout(() => ind.classList.remove("show"), 2000); }
+  }, 600);
+}
+
+// ---- HELPERS ----
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function calcScore(p) { return CRITERIA.reduce((s,c,i) => s + c.pondere * p.scores[i], 0); }
+function countScored(p) { return p.scores.filter(s => s > 0).length; }
+
+function calificativ(score) {
+  if (score <= 0) return {label:"—", cls:"cal-none"};
+  if (score < 1.8) return {label:"Sub Standard (SST)", cls:"cal-sst"};
+  if (score <= 2.69) return {label:"Standard (ST)", cls:"cal-st"};
+  return {label:"Peste Standard (PST)", cls:"cal-pst"};
+}
+function eligibilitate(score) {
+  if (score < 1.8) return "Nu este eligibil pentru bonus";
+  if (score <= 2.69) return "Bonus partial";
+  return "Bonus integral";
+}
+function initials(name) {
+  return name.trim().split(" ").slice(0,2).map(w=>w[0]||"").join("").toUpperCase() || "?";
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+function defaultPerson() {
+  return {id:uid(),marca:"",nume:"Persoana noua",echipa:"",departament:"",
+    perioada:"",data_eval:"",evaluator:"",manager:"",note_generale:"",
+    scores:new Array(CRITERIA.length).fill(0),
+    comments:new Array(CRITERIA.length).fill(""),
+    finalized:false};
+}
+
+// ---- CRUD ----
+function addPerson() {
+  saveCurrentInputs();
+  const p = defaultPerson();
+  persons.push(p);
+  activeId = p.id;
+  saveToStorage();
+  renderSidebar();
+  renderMain();
+}
+
+function selectPerson(id) {
+  saveCurrentInputs();
+  activeId = id;
+  renderSidebar();
+  renderMain();
+}
+
+function deletePerson(id) {
+  if (!confirm("Stergi aceasta evaluare? Datele nu pot fi recuperate.")) return;
+  persons = persons.filter(p => p.id !== id);
+  if (activeId === id) activeId = persons.length ? persons[persons.length-1].id : null;
+  saveToStorage();
+  renderSidebar();
+  renderMain();
+}
+
+function finalizePerson() {
+  saveCurrentInputs();
+  const p = persons.find(x => x.id === activeId);
+  if (!p) return;
+
+  // Validation
+  const errors = [];
+  if (!p.nume || p.nume === "Persoana noua") errors.push("Numele angajatului este obligatoriu");
+  if (!p.perioada) errors.push("Perioada de evaluare este obligatorie");
+  if (!p.evaluator) errors.push("Evaluatorul este obligatoriu");
+  const unscored = p.scores.filter(s => s === 0).length;
+  if (unscored > 0) errors.push(`${unscored} criteri${unscored===1?"u":"i"} fara scor — completeaza toate scorurile (1, 2 sau 3)`);
+
+  if (errors.length) {
+    const el = document.getElementById("val-error");
+    if (el) {
+      el.classList.add("show");
+      el.innerHTML = `<span>&#9888;</span><div><strong>Nu se poate finaliza:</strong><ul>${errors.map(e=>`<li>${e}</li>`).join("")}</ul></div>`;
+      el.scrollIntoView({behavior:"smooth", block:"center"});
+    }
+    return;
+  }
+
+  if (!confirm(`Finalizeaza evaluarea pentru ${p.nume}?\nDupa finalizare campurile nu mai pot fi modificate.`)) return;
+  p.finalized = true;
+  saveToStorage();
+
+  const np = defaultPerson();
+  persons.push(np);
+  activeId = np.id;
+  showToast("Evaluare finalizata. Evaluare noua deschisa.");
+  renderSidebar();
+  renderMain();
+}
+
+function duplicatePerson() {
+  saveCurrentInputs();
+  const src = persons.find(x => x.id === activeId);
+  if (!src) return;
+  const np = JSON.parse(JSON.stringify(src));
+  np.id = uid();
+  np.finalized = false;
+  np.nume = src.nume + " (copie)";
+  persons.push(np);
+  activeId = np.id;
+  saveToStorage();
+  showToast("Evaluare duplicata. Poti modifica datele.");
+  renderSidebar();
+  renderMain();
+}
+
+function resetAll() {
+  if (!persons.length) { showToast("Nu exista evaluari de sters."); return; }
+  if (!confirm("Stergi TOATE evaluarile? Aceasta actiune nu poate fi anulata.")) return;
+  persons = [];
+  activeId = null;
+  saveToStorage();
+  renderSidebar();
+  renderMain();
+  showToast("Toate evaluarile au fost sterse.");
+}
+
+function saveCurrentInputs() {
+  const p = persons.find(x => x.id === activeId);
+  if (!p || p.finalized) return;
+  ["marca","nume","echipa","departament","perioada","data_eval","evaluator","manager"].forEach(f => {
+    const el = document.getElementById("inf_"+f);
+    if (el) p[f] = el.value;
+  });
+  const ng = document.getElementById("inf_note_generale");
+  if (ng) p.note_generale = ng.value;
+  CRITERIA.forEach((_,i) => {
+    const sel = document.getElementById("score_"+i);
+    const com = document.getElementById("comment_"+i);
+    if (sel) p.scores[i] = parseFloat(sel.value)||0;
+    if (com) p.comments[i] = com.value;
+  });
+}
+
+// ---- RENDER SIDEBAR ----
+function renderSidebar() {
+  const list = document.getElementById("person-list");
+  list.innerHTML = "";
+  persons.forEach(p => {
+    const score = calcScore(p);
+    const cal = calificativ(score);
+    const scored = countScored(p);
+    const hasScore = scored > 0;
+    const pct = Math.round((scored/CRITERIA.length)*100);
+    const div = document.createElement("div");
+    div.className = "person-item"+(p.id===activeId?" active":"")+(p.finalized?" finalized":"");
+    div.onclick = () => selectPerson(p.id);
+    const scoreCls = hasScore ? (cal.cls==="cal-pst"?"pst":cal.cls==="cal-st"?"st":"sst") : "";
+    const scoreLabel = hasScore ? score.toFixed(2)+" — "+cal.label : "Neevaluat";
+    div.innerHTML = `
+      <div class="person-avatar ${p.finalized?"final":hasScore?"scored":""}">${initials(p.nume)}</div>
+      <div class="person-info">
+        <div class="person-name">${p.nume||"Persoana noua"}${p.finalized?'<span class="badge-final">FINAL</span>':''}</div>
+        <div class="person-meta ${scoreCls}">${scoreLabel}</div>
+        ${p.finalized ? `<div class="mini-chart">${p.scores.map(s=>`<div class="mini-bar b${s}" style="height:${s===0?4:s===1?8:s===2?13:18}px"></div>`).join("")}</div>` :
+        `<div class="progress-wrap">
+          <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+          <div class="progress-label">${scored}/${CRITERIA.length} criterii completate</div>
+        </div>`}
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+// ---- RENDER MAIN ----
+function renderMain() {
+  const main = document.getElementById("main-area");
+  if (!activeId || !persons.length) {
+    main.innerHTML = `<div class="empty-state"><div class="empty-icon">&#9881;</div><p>Nicio evaluare activa.<br>Adauga prima persoana pentru a incepe.</p><button onclick="addPerson()">+ Evaluare noua</button></div>`;
+    return;
+  }
+  const p = persons.find(x => x.id === activeId);
+  if (!p) return;
+  const score = calcScore(p);
+  const cal = calificativ(score);
+  const dis = p.finalized ? "disabled" : "";
+
+  main.innerHTML = `
+    <div class="topbar">
+      <h1>Evaluare: ${p.nume||"Persoana noua"}</h1>
+      <span class="score-badge">${score>0?score.toFixed(2):"—"}</span>
+      <span class="calificativ ${cal.cls}">${cal.label}</span>
+      <div class="topbar-actions">
+        <span class="saved-indicator" id="saved-ind">&#10003; Salvat</span>
+        <button class="btn-duplicate" onclick="duplicatePerson()" title="Duplicheaza aceasta evaluare">&#9112; Duplica</button>
+        <button class="btn-pdf" onclick="exportPDF()">&#128438; Exporta PDF</button>
+        ${!p.finalized?`<button class="btn-finalize" onclick="finalizePerson()">&#10003; Finalizeaza evaluarea</button>`:''}
+        <button class="btn-delete" onclick="deletePerson('${p.id}')">&#10005;</button>
+      </div>
+    </div>
+    <div class="form-area">
+
+      <div class="pdf-header">
+        <img src="data:image/svg+xml;base64,PHN2ZyBpZD0iRU9TLUxvZ29fMjAyMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2aWV3Qm94PSIwIDAgNzQwLjk0ODAzIDQyMy44ODA1MyI+PGRlZnM+PHN0eWxlPi5jbHMtMXtmaWxsOiNlYTAwMjk7fTwvc3R5bGU+PC9kZWZzPjxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTU2NS42ODgzNSwxOTMuMTkwNTloLTYxLjEzN2MuMjcyLjI3MSw3LjA2NSwxNC45NDQsMzguMDQxLDI5LjA3NGwxOS41NjMsOC45NjZjMTIuMjI4LDUuNzA2LDIzLjM2OCw5Ljc4MiwyMy4zNjgsMjIuMjgxLDAsMTYuMzAzLTE1LjQ4OCwyMC4zNzktMjUuODEzLDIwLjM3OS0xNy4xMTgsMC0zMi4wNjMtOC45NjctNDQuODM0LTI2LjM1N2wtMjUuOTI0MzQsMTkuMTAzLjExMTM1LjE4OWMxNC42NzMsMjUuMjcsMzkuMzk5LDQwLjIxNSw3MC4zNzUsNDAuMjE1LDM5Ljk0MywwLDY0LjY2OS0yMy42NCw2NC42NjktNTQuNjE2LDAtMjIuMjgxLTExLjY4NC0zNi4xMzgtMzYuNDEtNDguMzY2Wm0xOS44MzUtMTcuOTM0YzE2LjU3NSwwLDI5LjM0NjA2LTEyLjc3LDI5LjM0NjA2LTI5LjA3NGEyOC44ODc3MSwyOC44ODc3MSwwLDAsMC0yOS4zNDYwNi0yOS4zNDVjLTE2LjMwMywwLTI5LjA3NCwxMi43NzEtMjkuMDc0LDI5LjM0NWEyOC43NjQzLDI4Ljc2NDMsMCwwLDAsMjkuMDc0LDI5LjA3NG0tMzk2LjczMi0xMi4xMTdjLTQwLjU1OSwwLTcxLjk1MSwzMS4zOTMtNzEuOTUxLDcxLjk0OSwwLDQwLjU1OCwzMS42Nyw3MS45NTEsNzUuMjgzLDcxLjk1MSwyMS4xMTMsMCwzOS40NDgtNy41LDU1LjAwMi0yMC41NTdsLTE1LjU1NC0yNS41NThjLTExLjExNSw4LjYxMS0yMy4zMzQsMTMuODg5LTM4LjMzNywxMy44ODktMjAuMDAyLDAtMzQuMTY2LTkuNzIxLTM4LjYxNS0yNy4yMjRoOTYuMzk2YTk2LjExNyw5Ni4xMTcsMCwwLDAsMi41MDItMjAuNTU3YzAtMzUuNTU4LTI2LjExNC02My44OTMtNjQuNzI2LTYzLjg5M20tMzQuMTcyLDU4LjA2MmM0LjE2OC0xNy4yMjUsMTYuOTQ3LTI3Ljc4LDMyLjc4MS0yNy43OHMyOS40NDYsMTAuMjc3LDI5LjcyNCwyNy43OFptMjIyLjEwOS0xMDQuMzYzYy01My45NDUsMC05Ny4zMjcsNDEuMTU1LTk3LjMyNyw5NS4xLDAsNTMuOTQ4LDQzLjM4Miw5NS4xMDMsOTcuMzI3LDk1LjEwM3M5Ny44ODItNDEuMTU1LDk3Ljg4Mi05NS4xMDNjMC01My45NDUtNDMuOTM3LTk1LjEtOTcuODgyLTk1LjFtLjI3OCwxNTUuNDQzYy0zNC4yMDUsMC01OC45NTItMjQuNzUtNTguOTUyLTYwLjM0MywwLTM1LjMxNSwyNC43NDctNjAuMzQyLDU4Ljk1Mi02MC4zNDIsMzMuNjQ2LDAsNTguOTUxLDI1LjAyNyw1OC45NTEsNjAuMzQyLDAsMzUuNTkzLTI1LjMwNSw2MC4zNDMtNTguOTUxLDYwLjM0MyIvPjwvc3ZnPg==" alt="EOS" style="height:28px;width:auto;">
+        <div>
+          <div class="pdf-title">Scorecard — Bonus Trimestrial AI &amp; Automatizari</div>
+          <div class="pdf-sub">EOS KSI Romania &nbsp;|&nbsp; Evaluare individuala</div>
+        </div>
+        <div style="margin-left:auto;text-align:right;">
+          <div style="font-size:11px;color:var(--gd);">Scor final</div>
+          <div style="font-size:22px;font-weight:700;color:var(--black);">${score.toFixed(2)}</div>
+          <div style="font-size:11px;font-weight:600;color:var(--green);">${cal.label}</div>
+        </div>
+      </div>
+
+      <div class="val-error" id="val-error"></div>
+      ${p.finalized?`<div class="finalized-banner">&#10003; Evaluare finalizata — campurile nu mai pot fi modificate.</div>`:""}
+
+      <div class="section-card">
+        <div class="sc-header dark">Date angajat</div>
+        <div class="info-grid">
+          <div class="info-field"><label>Marca</label><input id="inf_marca" value="${p.marca}" ${dis} oninput="liveUpdate()"></div>
+          <div class="info-field"><label>Nume / Prenume</label><input id="inf_nume" value="${p.nume}" ${dis} oninput="liveUpdate()"></div>
+          <div class="info-field"><label>Echipa</label><input id="inf_echipa" value="${p.echipa}" ${dis} oninput="liveUpdate()"></div>
+          <div class="info-field"><label>Departament</label><input id="inf_departament" value="${p.departament}" ${dis} oninput="liveUpdate()"></div>
+          <div class="info-field"><label>Perioada evaluare</label><input id="inf_perioada" value="${p.perioada}" ${dis} placeholder="ex. Q2 2025" oninput="liveUpdate()"></div>
+          <div class="info-field"><label>Data evaluarii</label><input id="inf_data_eval" type="date" value="${p.data_eval}" ${dis} oninput="liveUpdate()"></div>
+          <div class="info-field"><label>Evaluator</label><input id="inf_evaluator" value="${p.evaluator}" ${dis} oninput="liveUpdate()"></div>
+          <div class="info-field"><label>Manager</label><input id="inf_manager" value="${p.manager}" ${dis} oninput="liveUpdate()"></div>
+        </div>
+        <div class="note-field" style="border-top:1px solid var(--border);">
+          <label>&#128196; Note generale / Observatii evaluare</label>
+          <textarea id="inf_note_generale" class="note-textarea" ${dis} placeholder="Observatii generale despre aceasta evaluare, context specific trimestrului, aspecte relevante...">${p.note_generale||""}</textarea>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="sc-header red">Criterii de evaluare</div>
+        <table class="ct">
+          <colgroup>
+            <col style="width:9%"><col style="width:12%"><col style="width:13%">
+            <col style="width:5%"><col style="width:15%"><col style="width:15%">
+            <col style="width:15%"><col style="width:6%"><col style="width:10%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Criteriu</th><th>Obiectiv</th><th>Indicator</th>
+              <th>Pond.</th><th>SST (1)</th><th>ST (2)</th><th>PST (3)</th>
+              <th>Punctaj</th><th>Comentarii</th>
+            </tr>
+            <tr class="subrow">
+              <td></td><td></td><td></td><td></td>
+              <td>Sub Standard</td><td>Standard</td><td>Peste Standard</td>
+              <td></td><td></td>
+            </tr>
+          </thead>
+          <tbody>
+            ${CRITERIA.map((c,i) => {
+              const sv = p.scores[i];
+              const selCls = sv===1?"s1":sv===2?"s2":sv===3?"s3":"";
+              return `<tr>
+                <td class="crit-cell">${c.criteriu}</td>
+                <td>${c.obiectiv}</td>
+                <td>${c.indicator}</td>
+                <td style="text-align:center;font-weight:600;">${Math.round(c.pondere*100)}%</td>
+                <td class="gray-desc">${c.sst}</td>
+                <td class="gray-desc">${c.st}</td>
+                <td class="gray-desc">${c.pst}</td>
+                <td style="text-align:center;">
+                  <select id="score_${i}" class="score-sel ${selCls}" ${dis} onchange="onScoreChange(${i},this)">
+                    <option value="0">—</option>
+                    <option value="1" ${sv===1?"selected":""}>1</option>
+                    <option value="2" ${sv===2?"selected":""}>2</option>
+                    <option value="3" ${sv===3?"selected":""}>3</option>
+                  </select>
+                </td>
+                <td><textarea id="comment_${i}" class="comment-inp" rows="2" ${dis} oninput="liveUpdate()">${p.comments[i]}</textarea></td>
+              </tr>`;
+            }).join("")}
+            <tr class="total-row">
+              <td colspan="3" style="text-align:right;">Total pondere</td>
+              <td style="text-align:center;">100%</td>
+              <td colspan="3" style="text-align:right;padding-right:10px;">Scor final (suma ponderi x punctaj):</td>
+              <td style="text-align:center;font-size:16px;" id="score-display">${score.toFixed(2)}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-card">
+        <div class="sc-header dark">Scala de evaluare</div>
+        <table class="scale-table">
+          <thead><tr><th>Scor</th><th>Calificativ</th><th>Eligibilitate bonus</th></tr></thead>
+          <tbody>
+            <tr><td>&lt; 1.80</td><td>Sub Standard (SST)</td><td>Nu este eligibil pentru bonus</td></tr>
+            <tr><td>1.80 – 2.69</td><td>Standard (ST)</td><td>Bonus partial (ex. 50% din valoarea stabilita)</td></tr>
+            <tr><td>&gt; 2.69</td><td>Peste Standard (PST)</td><td>Bonus integral</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sig-grid">
+        <div class="sig-box">
+          <div class="sc-header dark">Angajat — Am luat la cunostinta</div>
+          <div class="sig-content">
+            <div class="sig-labels"><span>Data: _______________</span><span>Semnatura: _______________</span></div>
+            <div class="sig-line"></div>
+          </div>
+        </div>
+        <div class="sig-box">
+          <div class="sc-header dark">Superior direct / Manager</div>
+          <div class="sig-content">
+            <div class="sig-labels"><span>Data: _______________</span><span>Semnatura: _______________</span></div>
+            <div class="sig-line"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pdf-footer">EOS KSI Romania &nbsp;|&nbsp; Scorecard AI &amp; Automatizari &nbsp;|&nbsp; Generat: ${new Date().toLocaleDateString("ro-RO")}</div>
+    </div>
+  `;
+}
+
+function onScoreChange(idx, sel) {
+  const v = parseInt(sel.value);
+  sel.className = "score-sel" + (v===1?" s1":v===2?" s2":v===3?" s3":"");
+  liveUpdate();
+}
+
+function liveUpdate() {
+  saveCurrentInputs();
+  const p = persons.find(x => x.id === activeId);
+  if (!p) return;
+  const score = calcScore(p);
+  const cal = calificativ(score);
+  const sd = document.getElementById("score-display");
+  if (sd) sd.textContent = score.toFixed(2);
+  const sb = document.querySelector(".score-badge");
+  if (sb) sb.textContent = score>0?score.toFixed(2):"—";
+  const ce = document.querySelector(".calificativ");
+  if (ce) { ce.textContent = cal.label; ce.className = "calificativ "+cal.cls; }
+  const th = document.querySelector(".topbar h1");
+  if (th) th.textContent = "Evaluare: "+(p.nume||"Persoana noua");
+  // hide validation error on change
+  const ve = document.getElementById("val-error");
+  if (ve) ve.classList.remove("show");
+  scheduleSave();
+  renderSidebar();
+}
+
+// ---- PDF EXPORT ----
+function exportPDF() {
+  saveCurrentInputs();
+  const p = persons.find(x => x.id === activeId);
+  if (!p) return;
+  const score = calcScore(p);
+  const cal = calificativ(score);
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:"landscape", unit:"mm", format:"a4" });
+
+  const RED = [234,0,41];
+  const GREEN = [47,124,133];
+  const BLACK = [49,23,31];
+  const GRAY = [240,240,240];
+  const GRAY_D = [89,89,89];
+  const WHITE = [255,255,255];
+
+  // Header
+  doc.setFillColor(...RED);
+  doc.rect(0,0,297,14,"F");
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(16);
+  doc.setTextColor(...WHITE);
+  doc.text("EOS",10,10);
+  doc.setFontSize(8);
+  doc.text("KSI Romania",10,14.5);
+  doc.setFontSize(11);
+  doc.text("SCORECARD — Bonus Trimestrial AI & Automatizari | EOS KSI Romania",36,10);
+
+  // Score box
+  doc.setFillColor(...GREEN);
+  doc.roundedRect(240,2,52,10,2,2,"F");
+  doc.setFontSize(8);
+  doc.text("Scor final:",242,7);
+  doc.setFontSize(14);
+  doc.text(score.toFixed(2),255,12);
+  doc.setFontSize(8);
+  doc.text(cal.label,268,7);
+
+  // Info block
+  let y = 20;
+  doc.setFillColor(...GRAY);
+  doc.rect(10,y,277,22,F);
+  doc.setTextColor(...GRAY_D);
+  doc.setFontSize(7);
+  doc.setFont("helvetica","normal");
+  const infoLeft = [
+    ["Marca:",p.marca||"—"],["Echipa:",p.echipa||"—"],["Departament:",p.departament||"—"],["Evaluator:",p.evaluator||"—"]
+  ];
+  const infoRight = [
+    ["Nume / Prenume:",p.nume||"—"],["Perioada:",p.perioada||"—"],["Data evaluarii:",p.data_eval||"—"],["Manager:",p.manager||"—"]
+  ];
+  infoLeft.forEach((item,i) => {
+    doc.setFont("helvetica","bold"); doc.setTextColor(...BLACK);
+    doc.text(item[0],12,y+5+(i*5));
+    doc.setFont("helvetica","normal"); doc.setTextColor(...GRAY_D);
+    doc.text(item[1],35,y+5+(i*5));
+  });
+  infoRight.forEach((item,i) => {
+    doc.setFont("helvetica","bold"); doc.setTextColor(...BLACK);
+    doc.text(item[0],150,y+5+(i*5));
+    doc.setFont("helvetica","normal"); doc.setTextColor(...GRAY_D);
+    doc.text(item[1],175,y+5+(i*5));
+  });
+
+  // Criteria table
+  y = 46;
+  const tableData = CRITERIA.map((c,i) => [
+    c.criteriu, c.obiectiv, c.indicator,
+    Math.round(c.pondere*100)+"%",
+    c.sst, c.st, c.pst,
+    p.scores[i]===0?"—":p.scores[i].toString(),
+    p.comments[i]||""
+  ]);
+
+  doc.autoTable({
+    startY: y,
+    head: [["Criteriu","Obiectiv","Indicator","Pond.","SST (1)","ST (2)","PST (3)","Punctaj","Comentarii"]],
+    body: tableData,
+    styles: { fontSize:7, cellPadding:2, lineColor:[220,220,220], lineWidth:0.2, textColor:[49,23,31] },
+    headStyles: { fillColor:RED, textColor:WHITE, fontStyle:"bold", fontSize:7.5 },
+    columnStyles: {
+      0:{cellWidth:22,fontStyle:"bold",fillColor:GRAY},
+      1:{cellWidth:32},2:{cellWidth:36},3:{cellWidth:12,halign:"center"},
+      4:{cellWidth:32,fillColor:GRAY},5:{cellWidth:32,fillColor:GRAY},6:{cellWidth:32,fillColor:GRAY},
+      7:{cellWidth:14,halign:"center",fontStyle:"bold"},8:{cellWidth:30}
+    },
+    foot: [["","","","100%","","","Scor final (suma ponderi x punctaj):","",""]],
+    footStyles: { fillColor:GREEN, textColor:WHITE, fontStyle:"bold" },
+    didParseCell: function(data) {
+      if (data.section==="foot" && data.column.index===7) {
+        data.cell.text = [score.toFixed(2)];
+        data.cell.styles.fontSize = 11;
+      }
+    },
+    margin: {left:10,right:10}
+  });
+
+  // Scale table
+  const finalY = doc.lastAutoTable.finalY + 6;
+  doc.setFillColor(...BLACK);
+  doc.rect(10,finalY,277,6,"F");
+  doc.setFont("helvetica","bold"); doc.setTextColor(...WHITE); doc.setFontSize(8);
+  doc.text("SCALA DE EVALUARE",148,finalY+4,{align:"center"});
+
+  doc.autoTable({
+    startY: finalY+6,
+    head: [["Scor","Calificativ","Eligibilitate bonus"]],
+    body: [["< 1.80","Sub Standard (SST)","Nu este eligibil pentru bonus"],["1.80 - 2.69","Standard (ST)","Bonus partial (ex. 50% din valoarea stabilita)"],["> 2.69","Peste Standard (PST)","Bonus integral"]],
+    styles: { fontSize:7.5, cellPadding:2, fillColor:GRAY, textColor:[49,23,31], halign:"center" },
+    headStyles: { fillColor:GRAY_D, textColor:WHITE, fontStyle:"bold" },
+    columnStyles: {0:{cellWidth:30},1:{cellWidth:60},2:{cellWidth:80}},
+    margin: {left:10,right:10}
+  });
+
+  // Signatures
+  const sigY = doc.lastAutoTable.finalY + 8;
+  doc.setFillColor(...GRAY);
+  doc.rect(10,sigY,135,18,"F");
+  doc.rect(152,sigY,135,18,"F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(...BLACK);
+  doc.text("Angajat — Am luat la cunostinta",12,sigY+5);
+  doc.text("Superior direct / Manager",154,sigY+5);
+  doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(...GRAY_D);
+  doc.text("Data: _______________",12,sigY+11);
+  doc.text("Semnatura: ___________________",55,sigY+11);
+  doc.text("Data: _______________",154,sigY+11);
+  doc.text("Semnatura: ___________________",197,sigY+11);
+
+  // Footer
+  doc.setFontSize(7); doc.setTextColor(...GRAY_D);
+  doc.text(`EOS KSI Romania | Scorecard AI & Automatizari | Generat: ${new Date().toLocaleDateString("ro-RO")}`,148,208,{align:"center"});
+
+  const fname = `Scorecard_AI_${(p.nume||"evaluare").replace(/\s+/g,"_")}_${p.perioada||new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(fname);
+}
+
+// ---- EXCEL EXPORT ----
+function exportExcel() {
+  saveCurrentInputs();
+  const finalized = persons.filter(p => p.finalized);
+  if (!finalized.length) { showToast("Nu exista evaluari finalizate de exportat."); return; }
+  const wb = XLSX.utils.book_new();
+  const header = [
+    "Marca","Nume / Prenume","Echipa","Departament","Perioada","Data evaluarii","Evaluator","Manager",
+    "P1 - Implicare proiecte AI","P1 - Calitate livrabile",
+    "P2 - Initiative adoptie AI","P2 - Masurare adoptie AI",
+    "P3 - Organizare evenimente","P3 - Impact evenimente",
+    "P4 - Competente AI","P4 - Diseminare cunostinte",
+    "Com1","Com2","Com3","Com4","Com5","Com6","Com7","Com8",
+    "Scor Final","Calificativ","Eligibilitate Bonus","Note generale"
+  ];
+  const rows = finalized.map(p => {
+    const score = calcScore(p);
+    const cal = calificativ(score);
+    return [p.marca,p.nume,p.echipa,p.departament,p.perioada,p.data_eval,p.evaluator,p.manager,
+      ...p.scores,...p.comments,parseFloat(score.toFixed(2)),cal.label,eligibilitate(score),p.note_generale||""];
+  });
+  const ws = XLSX.utils.aoa_to_sheet([header,...rows]);
+  ws["!cols"] = header.map((_,i) => ({wch:i<8?18:i<24?10:14}));
+  XLSX.utils.book_append_sheet(wb,ws,"Evaluari AI");
+  XLSX.writeFile(wb,`Scorecard_AI_EOS_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast(`Export Excel: ${finalized.length} evaluari finalizate`);
+}
+
+// ---- INIT ----
+loadFromStorage();
+if (persons.length) {
+  activeId = persons[persons.length-1].id;
+} 
+renderSidebar();
+renderMain();
+</script>
+</body>
+</html>
